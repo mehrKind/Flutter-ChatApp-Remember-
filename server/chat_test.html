@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>WebSocket Chat Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f7f7f7;
+      padding: 20px;
+    }
+    h2 {
+      color: #333;
+    }
+    #chat-log {
+      background: #fff;
+      border: 1px solid #ccc;
+      padding: 15px;
+      height: 300px;
+      overflow-y: auto;
+      margin-bottom: 10px;
+    }
+    #message-input {
+      width: 75%;
+      padding: 10px;
+      font-size: 14px;
+    }
+    #send-button {
+      padding: 10px 15px;
+      font-size: 14px;
+    }
+    .msg {
+      margin-bottom: 8px;
+    }
+    .msg em {
+      color: #888;
+    }
+    .sender {
+      font-weight: bold;
+      color: #007bff;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>WebSocket Chat Test</h2>
+  <div id="chat-log"></div>
+
+  <input id="message-input" type="text" placeholder="Type a message..." />
+  <button id="send-button">Send</button>
+
+  <script>
+    const roomId = 9;
+    const phoneNumber = prompt("Enter your phone number (e.g. 09120000001):");
+    const socket = new WebSocket(`ws://192.168.240.50:8000/ws/chat/${roomId}/${phoneNumber}/`);
+    let lastMessageId = null;
+
+    const chatLog = document.getElementById('chat-log');
+    const messageInput = document.getElementById('message-input');
+    const sendButton = document.getElementById('send-button');
+
+    socket.onopen = () => {
+      console.log("✅ Connected as " + phoneNumber);
+    };
+
+    socket.onmessage = function(e) {
+      const data = JSON.parse(e.data);
+
+      if (data.message) {
+        const msg = data.message;
+        lastMessageId = msg.id;
+
+        appendMessage(`<span class="sender">${msg.sender.phone_number}:</span> ${escapeHtml(typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content))}`);
+      } else if (data.message_id && data.sender_phone) {
+        appendMessage(`<em>✔ Message ${data.message_id} seen by ${data.sender_phone}</em>`);
+      }
+    };
+
+    function sendMessage() {
+      const message = messageInput.value.trim();
+
+      if (!message) return;
+
+      if (message.toLowerCase() === "seen") {
+        if (lastMessageId) {
+          socket.send(JSON.stringify({
+            action: "seen",
+            message_id: lastMessageId
+          }));
+        } else {
+          alert("No message ID to mark as seen.");
+        }
+      } else {
+        socket.send(JSON.stringify({
+          message: message
+        }));
+      }
+
+      messageInput.value = '';
+    }
+
+    function appendMessage(html) {
+      const p = document.createElement('p');
+      p.className = 'msg';
+      p.innerHTML = html;
+      chatLog.appendChild(p);
+      chatLog.scrollTop = chatLog.scrollHeight;
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement("div");
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    sendButton.addEventListener('click', sendMessage);
+    messageInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') sendMessage();
+    });
+  </script>
+</body>
+</html>
